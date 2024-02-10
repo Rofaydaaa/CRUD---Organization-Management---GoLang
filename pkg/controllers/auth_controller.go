@@ -135,7 +135,7 @@ func LoginUser() gin.HandlerFunc {
         // Convert seconds to uint
         userID := uint(seconds)
 
-        token, err := util.GenerateToken(userID)
+        token, err := util.GenerateToken(userID, user.Email)
         if err != nil {
             c.JSON(http.StatusInternalServerError, gin.H{
                 "error": "Error generating token",

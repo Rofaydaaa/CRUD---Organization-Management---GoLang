@@ -1,14 +1,15 @@
 package controller
 
 import (
-    "context"
-    "net/http"
-    "time"
+	"context"
+	"net/http"
+	"time"
 
-    model "organization_management/pkg/database/mongodb/models"
-    repository "organization_management/pkg/database/mongodb/repository"
+	model "organization_management/pkg/database/mongodb/models"
+	repository "organization_management/pkg/database/mongodb/repository"
+	util "organization_management/pkg/utils"
 
-    "github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin"
 )
 
 func CreateOrganization() gin.HandlerFunc {
@@ -29,6 +30,28 @@ func CreateOrganization() gin.HandlerFunc {
             c.JSON(http.StatusBadRequest, gin.H{"error": validationErr.Error()})
             return
         }
+
+		// get current authorized user
+		CurrentUserEmail, err := util.ExtractUserEmail(c)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve current user"})
+			return
+		}
+
+		// Retrieve the current authorized user by email
+		user, err := repository.GetUserByEmail(ctx, CurrentUserEmail)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve the current user"})
+			return
+		}
+
+		// Add the user to the organization members
+		orgMember := model.OrganizationMember{
+			Name:        user.Name,
+			UserEmail:       user.Email,
+			AccessLevel: "Founder",
+		}
+		org.OrganizationMembers = append(org.OrganizationMembers, orgMember)
 
         // Insert the organization into the database
         _, organizationId, err := repository.InsertOrganization(ctx, org)

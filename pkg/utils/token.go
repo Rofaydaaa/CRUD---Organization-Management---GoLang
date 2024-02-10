@@ -6,13 +6,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"errors"
 
 	"github.com/gin-gonic/gin"
 	jwt "github.com/dgrijalva/jwt-go"
 )
 
 // GenerateToken generates a JWT token for the given user ID.
-func GenerateToken(user_id uint) (string, error) {
+func GenerateToken(user_id uint, email string) (string, error) {
 	token_lifespan, err := strconv.Atoi(os.Getenv("TOKEN_HOUR_LIFESPAN"))
 	if err != nil {
 		return "", err
@@ -22,6 +23,7 @@ func GenerateToken(user_id uint) (string, error) {
 	claims := jwt.MapClaims{}
 	claims["authorized"] = true
 	claims["user_id"] = user_id
+	claims["email"] = email
 	claims["exp"] = time.Now().Add(time.Hour * time.Duration(token_lifespan)).Unix()
 
 	// Create token with claims and sign with secret
@@ -61,4 +63,27 @@ func ExtractToken(c *gin.Context) string {
 
 	// No token found
 	return ""
+}
+
+// ExtractUserEmail extracts the user email from the JWT token claims.
+func ExtractUserEmail(c *gin.Context) (string, error) {
+    tokenString := ExtractToken(c)
+    token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+        if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+            return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+        }
+        return []byte(os.Getenv("API_SECRET")), nil
+    })
+    if err != nil {
+        return "", err
+    }
+    claims, ok := token.Claims.(jwt.MapClaims)
+    if !ok || !token.Valid {
+        return "", errors.New("Invalid token claims")
+    }
+    email, ok := claims["email"].(string)
+    if !ok {
+        return "", errors.New("Email claim not found")
+    }
+    return email, nil
 }
