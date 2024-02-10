@@ -20,3 +20,6 @@ _test/
 
 # Binary files
 bin/
+
+# Env
+*.env
