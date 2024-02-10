@@ -1,6 +1,7 @@
 package pkg
 
 import (
+	middleware "organization_management/pkg/api/middleware"
 	route "organization_management/pkg/api/routes"
 	database "organization_management/pkg/database/mongodb"
 	util "organization_management/pkg/utils"
@@ -22,6 +23,11 @@ func StartApplication() {
 	public := router.Group("/api")
 	{
 		route.AuthRoutes(public)
+	}
+	protected := router.Group("/api")
+	{
+		protected.Use(middleware.JwtAuthMiddleware())
+		route.OrganizationRoutes(protected)
 	}
 
 	// run the server
