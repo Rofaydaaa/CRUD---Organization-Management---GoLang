@@ -39,6 +39,23 @@ func RegisterUser() gin.HandlerFunc {
             return
         }
 
+        // Validate the email address
+        if !model.ValidateEmail(user.Email) {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid email address"})
+            return
+        }
+
+        // Check if the user already exists
+        existingUser, err := repository.GetUserByEmail(ctx, user.Email)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check user existence"})
+            return
+        }
+        if existingUser != nil {
+            c.JSON(http.StatusConflict, gin.H{"error": "User with this email already exists"})
+            return
+        }
+
         // Hash the user's password before saving it
         if err := user.HashPassword(); err != nil {
             c.JSON(http.StatusInternalServerError, gin.H{

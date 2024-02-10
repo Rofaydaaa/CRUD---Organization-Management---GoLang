@@ -3,6 +3,8 @@ package model
 import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
+
+	"regexp"
 )
 
 // User represents a user in the database.
@@ -27,4 +29,11 @@ func (u *User) HashPassword() error {
 // VerifyPassword compares the user's password with the hashed password.
 func (u *User) VerifyPassword(password, hashedPassword string) error {
 	return bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
+}
+
+// ValidateEmail checks if the provided email address is valid.
+func ValidateEmail(email string) bool {
+    regex := `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`
+    match, _ := regexp.MatchString(regex, email)
+    return match
 }

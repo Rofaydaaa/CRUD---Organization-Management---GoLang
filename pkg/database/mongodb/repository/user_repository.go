@@ -2,7 +2,8 @@ package repository
 
 import (
     "context"
-
+    "errors"
+    
     model "organization_management/pkg/database/mongodb/models"
 	database "organization_management/pkg/database/mongodb"
 
@@ -38,7 +39,12 @@ func GetUserByEmail(ctx context.Context, email string) (*model.User, error) {
 	var user model.User
 	err := userCollection.FindOne(ctx, filter).Decode(&user)
 	if err != nil {
-		return nil, err // User not found or error occurred
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			// If the document doesn't exist or the result is empty, return nil
+			return nil, nil
+		}
+		// Return other errors
+		return nil, err
 	}
 
 	return &user, nil // Return the user if found
