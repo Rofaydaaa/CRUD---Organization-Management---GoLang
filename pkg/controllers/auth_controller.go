@@ -4,6 +4,8 @@ import (
     "context"
     "net/http"
     "time"
+    "os"
+    "fmt"
 
     model "organization_management/pkg/database/mongodb/models"
     repository "organization_management/pkg/database/mongodb/repository"
@@ -11,6 +13,7 @@ import (
 
     "github.com/gin-gonic/gin"
     "github.com/go-playground/validator/v10"
+    "github.com/dgrijalva/jwt-go"
 
 )
 
@@ -135,18 +138,75 @@ func LoginUser() gin.HandlerFunc {
         // Convert seconds to uint
         userID := uint(seconds)
 
-        token, err := util.GenerateToken(userID, user.Email)
+        token, refreshToken, err := util.GenerateToken(userID, user.Email)
         if err != nil {
             c.JSON(http.StatusInternalServerError, gin.H{
-                "error": "Error generating token",
+                "error": "Error generating tokens",
             })
             return
         }
 
-        // Respond with token and message
+        // Respond with tokens and message
         c.JSON(http.StatusOK, gin.H{
-            "token":   token,
-            "message": "Authentication successful",
+            "access_token":  token,
+            "refresh_token": refreshToken,
+            "message":       "Authentication successful",
+        })
+    }
+}
+
+// RefreshToken handles the refresh token request
+func RefreshToken() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        var input struct {
+            RefreshToken string `json:"refresh_token" binding:"required"`
+        }
+        if err := c.BindJSON(&input); err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+            return
+        }
+
+        // Parse and validate the refresh token
+        token, err := jwt.Parse(input.RefreshToken, func(token *jwt.Token) (interface{}, error) {
+            if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+                return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+            }
+            return []byte(os.Getenv("API_SECRET")), nil
+        })
+        if err != nil || !token.Valid {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid refresh token"})
+            return
+        }
+
+        // Extract user ID and email from the refresh token claims
+        claims, ok := token.Claims.(jwt.MapClaims)
+        if !ok {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid refresh token claims"})
+            return
+        }
+        userID, ok := claims["user_id"].(float64)
+        if !ok {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID in refresh token"})
+            return
+        }
+        email, ok := claims["email"].(string)
+        if !ok {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid email in refresh token"})
+            return
+        }
+
+        // Generate a new access token
+        accessToken, refreshToken, err := util.GenerateToken(uint(userID), email)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Error generating access token"})
+            return
+        }
+
+        // Respond with new access token and message
+        c.JSON(http.StatusOK, gin.H{
+            "access_token": accessToken,
+            "refresh_token": refreshToken,
+            "message":      "Access token refreshed successfully",
         })
     }
 }

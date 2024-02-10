@@ -12,24 +12,44 @@ import (
 	jwt "github.com/dgrijalva/jwt-go"
 )
 
-// GenerateToken generates a JWT token for the given user ID.
-func GenerateToken(user_id uint, email string) (string, error) {
-	token_lifespan, err := strconv.Atoi(os.Getenv("TOKEN_HOUR_LIFESPAN"))
-	if err != nil {
-		return "", err
-	}
+// GenerateToken generates a JWT access and refresh token for the given user ID and email.
+func GenerateToken(userID uint, email string) (string, string, error) {
+    tokenLifespan, err := strconv.Atoi(os.Getenv("TOKEN_HOUR_LIFESPAN"))
+    if err != nil {
+        return "", "", err
+    }
 
-	// Create JWT claims
-	claims := jwt.MapClaims{}
-	claims["authorized"] = true
-	claims["user_id"] = user_id
-	claims["email"] = email
-	claims["exp"] = time.Now().Add(time.Hour * time.Duration(token_lifespan)).Unix()
+    // Create JWT claims for access token
+    accessClaims := jwt.MapClaims{}
+    accessClaims["authorized"] = true
+    accessClaims["user_id"] = userID
+    accessClaims["email"] = email
+    accessClaims["exp"] = time.Now().Add(time.Hour * time.Duration(tokenLifespan)).Unix()
 
-	// Create token with claims and sign with secret
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(os.Getenv("API_SECRET")))
+    // Create access token with claims and sign with secret
+    accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
+    accessTokenString, err := accessToken.SignedString([]byte(os.Getenv("API_SECRET")))
+    if err != nil {
+        return "", "", err
+    }
+
+    // Create JWT claims for refresh token
+    refreshClaims := jwt.MapClaims{}
+    refreshClaims["authorized"] = true
+    refreshClaims["user_id"] = userID
+    refreshClaims["email"] = email
+    refreshClaims["exp"] = time.Now().Add(time.Hour * 24 * 30).Unix() // Set refresh token expiration to 30 days
+
+    // Create refresh token with claims and sign with secret
+    refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
+    refreshTokenString, err := refreshToken.SignedString([]byte(os.Getenv("API_SECRET")))
+    if err != nil {
+        return "", "", err
+    }
+
+    return accessTokenString, refreshTokenString, nil
 }
+
 
 // TokenValid checks if the JWT token provided in the request is valid.
 func TokenValid(c *gin.Context) error {
