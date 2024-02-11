@@ -6,6 +6,7 @@ import (
 )
 
 func EnvMongoURI() string {
+	
     uri := os.Getenv("MONGOURI")
 	if uri == "" {
 		log.Fatal("MONGOURI environment variable is not set")

@@ -10,3 +10,7 @@ func AuthRoutes(routerGroup *gin.RouterGroup) {
 	routerGroup.POST("/signin", controller.LoginUser())
 	routerGroup.POST("/refresh-token", controller.RefreshToken())
 }
+
+func ProtectedUderRoutes(routerGroup *gin.RouterGroup) {
+	routerGroup.POST("/revoke-refresh-token/", controller.RevokeToken())
+}

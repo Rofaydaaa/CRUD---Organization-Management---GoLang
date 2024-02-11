@@ -5,11 +5,14 @@ import (
     "net/http"
     "time"
     "os"
+    "strconv"
     "fmt"
 
     model "organization_management/pkg/database/mongodb/models"
     repository "organization_management/pkg/database/mongodb/repository"
+    repository_token "organization_management/pkg/database/redis/repository"
 	util "organization_management/pkg/utils"
+    redis "organization_management/pkg/database/redis"
 
     "github.com/gin-gonic/gin"
     "github.com/go-playground/validator/v10"
@@ -146,6 +149,16 @@ func LoginUser() gin.HandlerFunc {
             return
         }
 
+        // Save refresh token in Redis
+		tokenRepo := repository_token.NewTokenRepository(redis.RedisClient)
+        // Convert userID to string
+        userIDStr := strconv.FormatUint(uint64(userID), 10)
+		err = tokenRepo.SaveRefreshToken(userIDStr, refreshToken)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save refresh token"})
+			return
+		}
+
         // Respond with tokens and message
         c.JSON(http.StatusOK, gin.H{
             "access_token":  token,
@@ -178,7 +191,7 @@ func RefreshToken() gin.HandlerFunc {
             return
         }
 
-        // Extract user ID and email from the refresh token claims
+        // Extract user ID from the refresh token claims
         claims, ok := token.Claims.(jwt.MapClaims)
         if !ok {
             c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid refresh token claims"})
@@ -189,24 +202,75 @@ func RefreshToken() gin.HandlerFunc {
             c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID in refresh token"})
             return
         }
+
+        // Revoke the old refresh token
+		tokenRepo := repository_token.NewTokenRepository(redis.RedisClient)
+        // Convert userID to string
+        userIDStr := strconv.FormatUint(uint64(userID), 10)
+        err = tokenRepo.RevokeRefreshTokenWithId(userIDStr)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to revoke refresh token"})
+            return
+        }
+
+        // Generate a new access token and refresh token
         email, ok := claims["email"].(string)
         if !ok {
             c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid email in refresh token"})
             return
         }
-
-        // Generate a new access token
         accessToken, refreshToken, err := util.GenerateToken(uint(userID), email)
         if err != nil {
             c.JSON(http.StatusInternalServerError, gin.H{"error": "Error generating access token"})
             return
         }
 
+        // Save the new refresh token in Redis
+		err = tokenRepo.SaveRefreshToken(userIDStr, refreshToken)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save refresh token"})
+			return
+		}
+
         // Respond with new access token and message
         c.JSON(http.StatusOK, gin.H{
-            "access_token": accessToken,
+            "access_token":  accessToken,
             "refresh_token": refreshToken,
-            "message":      "Access token refreshed successfully",
+            "message":       "Access token refreshed successfully",
         })
     }
+}
+
+type RevokeRefreshTokenRequest struct {
+    RefreshToken string `json:"refresh_token"`
+}
+
+type RevokeRefreshTokenResponse struct {
+    Message string `json:"message"`
+}
+
+func RevokeToken() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req RevokeRefreshTokenRequest
+	    if err := c.BindJSON(&req); err != nil {
+		    c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		    return
+	    }
+
+	    // Initialize token repository with Redis client
+	    tokenRepo := repository_token.NewTokenRepository(redis.RedisClient)
+
+	    // Revoke the refresh token
+	    err := tokenRepo.RevokeRefreshToken(req.RefreshToken)
+	    if err != nil {
+	    	c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to revoke refresh token"})
+	    	return
+	    }
+
+	    // Respond with success message
+	    resp := RevokeRefreshTokenResponse{
+	    	Message: "Refresh token revoked successfully",
+	    }
+	    c.JSON(http.StatusOK, resp)
+	    }
 }

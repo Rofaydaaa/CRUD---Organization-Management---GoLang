@@ -5,6 +5,7 @@ import (
 	route "organization_management/pkg/api/routes"
 	database "organization_management/pkg/database/mongodb"
 	util "organization_management/pkg/utils"
+	redis "organization_management/pkg/database/redis"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,7 +19,7 @@ func StartApplication() {
 
 	//run database
 	database.ConnectDB()
-	//redis.InitRedis()
+	redis.InitRedis()
 
 	// apply routes
 	public := router.Group("/api")
@@ -29,6 +30,7 @@ func StartApplication() {
 	{
 		protected.Use(middleware.JwtAuthMiddleware())
 		route.OrganizationRoutes(protected)
+		route.ProtectedUderRoutes(protected)
 	}
 
 	// run the server
