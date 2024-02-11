@@ -18,6 +18,7 @@ func StartApplication() {
 
 	//run database
 	database.ConnectDB()
+	//redis.InitRedis()
 
 	// apply routes
 	public := router.Group("/api")
