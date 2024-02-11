@@ -3,16 +3,14 @@ package util
 import (
 	"log"
 	"os"
-	"github.com/joho/godotenv"
 )
 
 func EnvMongoURI() string {
-    err := godotenv.Load()
-    if err != nil {
-        log.Fatal("Error loading .env file")
-    }
-  
-    return os.Getenv("MONGOURI")
+    uri := os.Getenv("MONGOURI")
+	if uri == "" {
+		log.Fatal("MONGOURI environment variable is not set")
+	}
+	return uri
 }
 
 func EnvPort() string {
