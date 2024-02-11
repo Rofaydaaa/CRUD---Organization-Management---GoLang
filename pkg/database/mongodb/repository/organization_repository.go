@@ -76,6 +76,27 @@ func GetAllOrganizations(ctx context.Context) ([]model.Organization, error) {
 	return orgs, nil
 }
 
+// GetOrganizationsByMemberEmail retrieves organizations where the specified user is a member.
+func GetOrganizationsByMemberEmail(ctx context.Context, userEmail string) ([]model.Organization, error) {
+	// Define a filter to find organizations where the user is a member
+	filter := bson.M{"organization_members.email": userEmail}
+
+	// Retrieve organizations from the database based on the filter
+	cursor, err := orgCollection.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	// Decode the retrieved documents into a slice of Organization structs
+	var orgs []model.Organization
+	if err := cursor.All(ctx, &orgs); err != nil {
+		return nil, err
+	}
+
+	return orgs, nil
+}
+
 func UpdateOrganization(ctx context.Context, org *model.Organization) error {
 	// Check if organization exists
 	_, err := GetOrganizationByID(ctx, org.OrganizationId)

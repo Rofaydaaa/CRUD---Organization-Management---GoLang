@@ -271,3 +271,60 @@ func InviteUserToOrganization() gin.HandlerFunc {
 		c.JSON(http.StatusOK, gin.H{"message": "User invited successfully"})
 	}
 }
+
+func GetUserOrganizations() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+        defer cancel()
+
+        // Get the current user's email
+        currentUserEmail, err := util.ExtractUserEmail(c)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve current user"})
+            return
+        }
+
+        // Retrieve the user from the database by email
+        user, err := repository.GetUserByEmail(ctx, currentUserEmail)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user"})
+            return
+        }
+
+        // Check if the user exists
+        if user == nil {
+            c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+            return
+        }
+
+        // Retrieve organizations where the user is a member
+        orgs, err := repository.GetOrganizationsByMemberEmail(ctx, currentUserEmail)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve organizations"})
+            return
+        }
+
+        // Prepare the response JSON array
+        var orgList []gin.H
+        for _, org := range orgs {
+            // Check if organization members list is nil, and replace with an empty list if so
+            var members []model.OrganizationMember
+            if org.OrganizationMembers != nil {
+                members = org.OrganizationMembers
+            } else {
+                members = []model.OrganizationMember{}
+            }
+
+            // Append organization details to the response array
+            orgList = append(orgList, gin.H{
+                "organization_id":      org.OrganizationId,
+                "name":                 org.Name,
+                "description":          org.Description,
+                "organization_members": members,
+            })
+        }
+
+        // Return the response JSON array
+        c.JSON(http.StatusOK, orgList)
+    }
+}
