@@ -25,9 +25,9 @@ services:
       - "6379:6379"
     env_file: .env
     volumes:
-      - redisData:/data
+      - redisD:/data
     command: redis-server --appendonly yes
 
 volumes:
   mdata: {}
-  redisData: {}
+  redisD: {}
